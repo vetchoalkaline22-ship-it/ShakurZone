@@ -1,0 +1,118 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: merchants
+    // Document ID: {merchantId} (Matches Auth UID)
+    // Fields:
+    //   - uid: string (required)
+    //   - shopName: string (required)
+    //   - shopDescription: string (optional)
+    //   - logoUrl: string (optional)
+    //   - bannerUrl: string (optional)
+    //   - currency: string (required)
+    //   - contactPhone: string (optional)
+    //   - location: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: products
+    // Document ID: auto-generated
+    // Fields:
+    //   - merchantId: string (required)
+    //   - title: string (required)
+    //   - price: number (required)
+    //   - category: string (required)
+    //   - stock: int (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: orders
+    // Document ID: auto-generated
+    // Fields:
+    //   - merchantId: string (required)
+    //   - customerName: string (required)
+    //   - customerPhone: string (required)
+    //   - items: list (required)
+    //   - totalAmount: number (required)
+    //   - status: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isRecent(ts) {
+      return ts > request.time - duration.value(5, "m") &&
+             ts < request.time + duration.value(5, "m");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function isValidMerchant(data) {
+      return data.uid is string &&
+             data.shopName is string && data.shopName.size() >= 1 && data.shopName.size() <= 100 &&
+             (!("shopDescription" in data) || (data.shopDescription is string && data.shopDescription.size() <= 1000)) &&
+             (!("logoUrl" in data) || isValidUrl(data.logoUrl)) &&
+             (!("bannerUrl" in data) || isValidUrl(data.bannerUrl)) &&
+             data.currency is string && data.currency.size() == 3 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidProduct(data) {
+      return data.merchantId is string &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             data.price is number && data.price > 0 &&
+             data.category is string &&
+             data.stock is int && data.stock >= 0 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidOrder(data) {
+      return data.merchantId is string &&
+             data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 100 &&
+             data.customerPhone is string && data.customerPhone.size() >= 1 && data.customerPhone.size() <= 20 &&
+             data.items is list && data.items.size() <= 50 &&
+             data.totalAmount is number && data.totalAmount > 0 &&
+             data.status in ["pending", "paid", "shipped", "delivered", "cancelled"] &&
+             data.createdAt is timestamp;
+    }
+
+    match /merchants/{merchantId} {
+      allow read: if true;
+      allow create: if isOwner(merchantId) && isValidMerchant(request.resource.data) && isRecent(request.resource.data.createdAt);
+      allow update: if isOwner(merchantId) && isValidMerchant(request.resource.data) && 
+                       request.resource.data.uid == resource.data.uid &&
+                       request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isOwner(request.resource.data.merchantId) && 
+                       isValidProduct(request.resource.data) && isRecent(request.resource.data.createdAt);
+      allow update: if isAuthenticated() && isOwner(resource.data.merchantId) && 
+                       request.resource.data.merchantId == resource.data.merchantId &&
+                       isValidProduct(request.resource.data) &&
+                       request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAuthenticated() && isOwner(resource.data.merchantId);
+    }
+
+    match /orders/{orderId} {
+      allow create: if isValidOrder(request.resource.data) && isRecent(request.resource.data.createdAt);
+      allow read: if isAuthenticated() && isOwner(resource.data.merchantId);
+      allow update: if isAuthenticated() && isOwner(resource.data.merchantId) && 
+                       request.resource.data.merchantId == resource.data.merchantId &&
+                       isValidOrder(request.resource.data) &&
+                       request.resource.data.createdAt == resource.data.createdAt;
+    }
+  }
+}

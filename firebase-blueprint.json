@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "Merchant": {
+      "title": "Merchant",
+      "description": "A shop owner on the platform",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "shopName": { "type": "string", "description": "Name of the shop" },
+        "shopDescription": { "type": "string", "description": "Description of the shop" },
+        "logoUrl": { "type": "string", "format": "uri", "description": "URL to shop logo" },
+        "bannerUrl": { "type": "string", "format": "uri", "description": "URL to shop banner" },
+        "currency": { "type": "string", "description": "Preferred currency code (e.g., XOF, NGN)" },
+        "contactPhone": { "type": "string", "description": "Contact phone number (Mobile Money enabled)" },
+        "location": { "type": "string", "description": "City and Country" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "shopName", "currency"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "An item for sale",
+      "type": "object",
+      "properties": {
+        "merchantId": { "type": "string", "description": "UID of the merchant" },
+        "title": { "type": "string", "description": "Product title" },
+        "description": { "type": "string", "description": "Product description" },
+        "price": { "type": "number", "description": "Price in merchant's currency" },
+        "category": { "type": "string", "description": "Product category" },
+        "images": { "type": "array", "items": { "type": "string", "format": "uri" }, "description": "List of product image URLs" },
+        "stock": { "type": "integer", "description": "Available quantity" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["merchantId", "title", "price", "category"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer purchase",
+      "type": "object",
+      "properties": {
+        "merchantId": { "type": "string", "description": "UID of the merchant" },
+        "customerName": { "type": "string", "description": "Customer name" },
+        "customerPhone": { "type": "string", "description": "Customer phone (for Mobile Money)" },
+        "items": { "type": "array", "description": "List of ordered items" },
+        "totalAmount": { "type": "number", "description": "Total order amount" },
+        "status": { "type": "string", "enum": ["pending", "paid", "shipped", "delivered", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["merchantId", "customerName", "customerPhone", "totalAmount", "status"]
+    }
+  },
+  "firestore": {
+    "/merchants/{merchantId}": {
+      "schema": "Merchant",
+      "description": "Merchant profiles"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Product catalog"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders"
+    }
+  }
+}
